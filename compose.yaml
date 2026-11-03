@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: transactions
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d transactions"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/transactions
+    depends_on:
+      db:
+        condition: service_healthy
+  worker:
+    build: .
+    command: ["python", "-m", "worker.processor"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/transactions
+      PROCESSING_SECONDS: 30
+      LEASE_SECONDS: 90
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  postgres_data:
